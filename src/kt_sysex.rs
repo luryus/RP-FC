@@ -1,8 +1,7 @@
-
 pub enum RxValidateRes {
     Incomplete,
     Complete,
-    Invalid(RxValidationError)
+    Invalid(RxValidationError),
 }
 
 #[derive(defmt::Format)]
@@ -38,11 +37,12 @@ pub fn validate_rx(buf: &[u8]) -> RxValidateRes {
     } else {
         Complete
     }
-
 }
 
 pub fn status(footswitch: u8) -> crate::kt_uart::MsgBuf {
-    let mut m: crate::kt_uart::MsgBuf = [0xf0, 0, 0, 0, 0, footswitch, 0, 0, 0xF7].into_iter().collect();
+    let mut m: crate::kt_uart::MsgBuf = [0xf0, 0, 0, 0, 0, footswitch, 0, 0, 0xF7]
+        .into_iter()
+        .collect();
     _ = set_checksum(&mut m[..]);
     m
 }
@@ -55,7 +55,9 @@ fn set_checksum(msg: &mut [u8]) -> Result<(), MessageTooShort> {
 }
 
 fn validate_checksum(msg: &[u8]) -> bool {
-    let Ok(ours) = checksum(msg) else { return false };
+    let Ok(ours) = checksum(msg) else {
+        return false;
+    };
     let theirs = msg[msg.len() - 2];
 
     theirs == ours
@@ -66,7 +68,10 @@ fn checksum(msg: &[u8]) -> Result<u8, MessageTooShort> {
         return Err(MessageTooShort);
     }
 
-    Ok(0x80 - msg[..msg.len() - 2].iter().fold(0u8, |acc, x| (acc + x) & 0x7f))
+    Ok(0x80
+        - msg[..msg.len() - 2]
+            .iter()
+            .fold(0u8, |acc, x| (acc + x) & 0x7f))
 }
 
 #[cfg(test)]

@@ -16,12 +16,12 @@ use bsp::hal::{
     clocks::{init_clocks_and_plls, Clock, ClocksManager},
     fugit::RateExtU32,
     pac::{self, interrupt},
-    sio::Sio,
     pio::PIOExt,
+    sio::Sio,
     timer, uart,
     watchdog::Watchdog,
 };
-use time::{*, InstantEx};
+use time::{InstantEx, *};
 
 extern crate alloc;
 
@@ -113,13 +113,15 @@ fn main() -> ! {
         pins.gpio10.reconfigure().into_dyn_pin(),
     ];
 
-
     let (mut pio0, sm0, _, _, _) = pac.PIO0.split(&mut pac.RESETS);
 
-    unwrap!(
-        buttons::init_buttons::<_, _, 0>(sm0, &mut pio0, clocks.system_clock.freq(), button_pins)
-            .map_err(|_| "PIO install error")
-    );
+    unwrap!(buttons::init_buttons::<_, _, 0>(
+        sm0,
+        &mut pio0,
+        clocks.system_clock.freq(),
+        button_pins
+    )
+    .map_err(|_| "PIO install error"));
 
     let mut next_status_send = timer.now().offset_ms(300);
 
@@ -128,7 +130,7 @@ fn main() -> ! {
 
         while let Some(ch) = buttons::pop_change_queue() {
             ktuart.enqueue_send(kt_sysex::status(ch));
-        } 
+        }
 
         if timer.has_passed(next_status_send) {
             let btn = buttons::current();

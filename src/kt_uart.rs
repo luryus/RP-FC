@@ -133,7 +133,11 @@ impl<'t, Pins: uart::ValidUartPinout<pac::UART1>> KatanaUart<'t, Pins> {
         match ss {
             SendState::Send(buf, pos) => {
                 self.uart.write_full_blocking(&buf[pos..pos + 1]);
-                Some(State::Sending(SendState::WaitingEcho(buf, pos, self.timer.now())))
+                Some(State::Sending(SendState::WaitingEcho(
+                    buf,
+                    pos,
+                    self.timer.now(),
+                )))
             }
             SendState::WaitingEcho(buf, pos, wait_started) => {
                 if self.uart.uart_is_readable() {
@@ -164,7 +168,6 @@ impl<'t, Pins: uart::ValidUartPinout<pac::UART1>> KatanaUart<'t, Pins> {
                 } else {
                     None
                 }
-
             }
         }
     }
