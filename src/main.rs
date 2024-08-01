@@ -10,15 +10,15 @@ use defmt_rtt as _;
 use embedded_alloc::Heap;
 use panic_probe as _;
 
+use rp2040_hal::gpio::PullNone;
 use rp_pico as bsp;
 
 use bsp::hal::{
-    clocks::{init_clocks_and_plls, Clock, ClocksManager},
-    fugit::RateExtU32,
+    clocks::{init_clocks_and_plls, Clock},
     pac::{self, interrupt},
     pio::PIOExt,
     sio::Sio,
-    timer, uart,
+    timer,
     watchdog::Watchdog,
 };
 use time::{InstantEx, *};
@@ -32,23 +32,6 @@ mod time;
 
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
-
-fn init_uart(
-    uart: pac::UART1,
-    resets: &mut pac::RESETS,
-    pins: impl uart::ValidUartPinout<pac::UART1>,
-    clocks: &ClocksManager,
-) -> Result<
-    uart::UartPeripheral<uart::Enabled, pac::UART1, impl uart::ValidUartPinout<pac::UART1>>,
-    uart::Error,
-> {
-    let uart = uart::UartPeripheral::new(uart, pins, resets).enable(
-        uart::UartConfig::new(62500.Hz(), uart::DataBits::Eight, None, uart::StopBits::One),
-        clocks.peripheral_clock.freq(),
-    )?;
-
-    Ok(uart)
-}
 
 #[interrupt]
 fn PIO0_IRQ_0() {
@@ -96,14 +79,17 @@ fn main() -> ! {
         &mut pac.RESETS,
     );
 
-    let uart = unwrap!(init_uart(
+    let uart_pins = (
+        pins.gpio4.into_function().into_pull_type::<PullNone>(),
+        pins.gpio5.into_function().into_pull_type::<PullNone>(),
+    );
+    let mut ktuart = unwrap!(kt_uart::KatanaUart::new(
         pac.UART1,
         &mut pac.RESETS,
-        (pins.gpio4.into_function(), pins.gpio5.into_function()),
-        &clocks
+        uart_pins,
+        &clocks,
+        &timer
     ));
-
-    let mut ktuart = kt_uart::KatanaUart::new(uart, &timer);
 
     let button_pins = [
         pins.gpio6.reconfigure().into_dyn_pin(),

@@ -449,15 +449,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "itertools"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
-dependencies = [
- "either",
-]
-
-[[package]]
 name = "katanactl2"
 version = "0.1.0"
 dependencies = [
@@ -469,7 +460,6 @@ dependencies = [
  "embedded-alloc",
  "embedded-hal 1.0.0",
  "heapless",
- "itertools 0.13.0",
  "panic-probe",
  "pio",
  "pio-proc",
@@ -489,7 +479,7 @@ dependencies = [
  "diff",
  "ena",
  "is-terminal",
- "itertools 0.10.5",
+ "itertools",
  "lalrpop-util",
  "petgraph",
  "regex",
@@ -856,7 +846,7 @@ dependencies = [
  "embedded-io",
  "frunk",
  "fugit",
- "itertools 0.10.5",
+ "itertools",
  "nb 1.1.0",
  "paste",
  "pio",

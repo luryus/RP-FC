@@ -1,8 +1,10 @@
 use heapless::Deque;
 use rp2040_hal::{
+    clocks::ClocksManager,
+    fugit::RateExtU32,
     pac,
     timer::{self, Instant},
-    uart,
+    uart::{self, UartDevice}, Clock,
 };
 
 use crate::{
@@ -12,26 +14,35 @@ use crate::{
 
 pub type MsgBuf = heapless::Vec<u8, 16>;
 
-pub struct KatanaUart<'t, Pins: uart::ValidUartPinout<pac::UART1>> {
-    uart: uart::UartPeripheral<uart::Enabled, pac::UART1, Pins>,
+pub struct KatanaUart<'t, UART: UartDevice, Pins: uart::ValidUartPinout<UART>> {
+    uart: uart::UartPeripheral<uart::Enabled, UART, Pins>,
     timer: &'t timer::Timer,
     state: State,
     tx_queue: Deque<MsgBuf, 5>,
     rx_queue: Deque<MsgBuf, 2>,
 }
 
-impl<'t, Pins: uart::ValidUartPinout<pac::UART1>> KatanaUart<'t, Pins> {
+impl<'t, UART: UartDevice, Pins: uart::ValidUartPinout<UART>> KatanaUart<'t, UART, Pins> {
     pub fn new(
-        u: uart::UartPeripheral<uart::Enabled, pac::UART1, Pins>,
+        u: UART,
+        resets: &mut pac::RESETS,
+        pins: Pins,
+        clocks: &ClocksManager,
         timer: &'t timer::Timer,
-    ) -> Self {
-        Self {
-            uart: u,
+    ) -> Result<Self, uart::Error> {
+
+        let uart = uart::UartPeripheral::new(u, pins, resets).enable(
+            uart::UartConfig::new(62500.Hz(), uart::DataBits::Eight, None, uart::StopBits::One),
+            clocks.peripheral_clock.freq(),
+        )?;
+
+        Ok(Self {
+            uart,
             timer,
             state: State::Idle,
             tx_queue: Default::default(),
             rx_queue: Default::default(),
-        }
+        })
     }
 
     pub fn enqueue_send(&mut self, msg: MsgBuf) {
