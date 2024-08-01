@@ -13,6 +13,8 @@ pub enum RxValidationError {
     InvalidEnd,
 }
 
+struct MessageTooShort;
+
 const RX_MSG_LEN: usize = 6;
 const RX_MSG_BEGIN: u8 = 0xf0;
 const RX_MSG_END: u8 = 0xf7;
@@ -41,27 +43,30 @@ pub fn validate_rx(buf: &[u8]) -> RxValidateRes {
 
 pub fn status(footswitch: u8) -> crate::kt_uart::MsgBuf {
     let mut m: crate::kt_uart::MsgBuf = [0xf0, 0, 0, 0, 0, footswitch, 0, 0, 0xF7].into_iter().collect();
-
-    let chksum = unsafe { checksum_unchecked(&m) };
-    let len = m.len();
-    m[len - 2] = chksum;
+    _ = set_checksum(&mut m[..]);
     m
 }
 
-fn validate_checksum(buf: &[u8]) -> bool {
-    if buf.len() < 2 {
-        return false
-    }
+fn set_checksum(msg: &mut [u8]) -> Result<(), MessageTooShort> {
+    let chksum = checksum(msg)?;
+    let len = msg.len();
+    msg[len - 2] = chksum;
+    Ok(())
+}
 
-    let theirs = buf[buf.len() - 2];
-    // SAFETY: length checked above
-    let ours = unsafe { checksum_unchecked(buf) };
+fn validate_checksum(msg: &[u8]) -> bool {
+    let Ok(ours) = checksum(msg) else { return false };
+    let theirs = msg[msg.len() - 2];
 
     theirs == ours
 }
 
-unsafe fn checksum_unchecked(full_msg: &[u8]) -> u8 {
-    0x80 - full_msg[..full_msg.len() - 2].iter().fold(0u8, |acc, x| (acc + x) & 0x7f)
+fn checksum(msg: &[u8]) -> Result<u8, MessageTooShort> {
+    if msg.len() < 2 {
+        return Err(MessageTooShort);
+    }
+
+    Ok(0x80 - msg[..msg.len() - 2].iter().fold(0u8, |acc, x| (acc + x) & 0x7f))
 }
 
 #[cfg(test)]

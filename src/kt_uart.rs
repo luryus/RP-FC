@@ -164,6 +164,7 @@ impl<'t, Pins: uart::ValidUartPinout<pac::UART1>> KatanaUart<'t, Pins> {
                 } else {
                     None
                 }
+
             }
         }
     }

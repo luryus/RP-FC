@@ -7,6 +7,7 @@
 use bsp::entry;
 use defmt::*;
 use defmt_rtt as _;
+use embedded_alloc::Heap;
 use panic_probe as _;
 
 use rp_pico as bsp;
@@ -14,17 +15,23 @@ use rp_pico as bsp;
 use bsp::hal::{
     clocks::{init_clocks_and_plls, Clock, ClocksManager},
     fugit::RateExtU32,
-    pac,
+    pac::{self, interrupt},
     sio::Sio,
+    pio::PIOExt,
     timer, uart,
     watchdog::Watchdog,
 };
-use time::InstantEx;
-use time::*;
+use time::{*, InstantEx};
 
+extern crate alloc;
+
+mod buttons;
 mod kt_sysex;
 mod kt_uart;
 mod time;
+
+#[global_allocator]
+static HEAP: Heap = Heap::empty();
 
 fn init_uart(
     uart: pac::UART1,
@@ -43,9 +50,22 @@ fn init_uart(
     Ok(uart)
 }
 
+#[interrupt]
+fn PIO0_IRQ_0() {
+    buttons::on_interrupt();
+}
+
+fn init_allocator() {
+    use core::mem::MaybeUninit;
+    const HEAP_SIZE: usize = 2048;
+    static mut HEAP_MEM: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
+    unsafe { HEAP.init(HEAP_MEM.as_ptr() as usize, HEAP_SIZE) };
+}
+
 #[entry]
 fn main() -> ! {
-    info!("Program start");
+    init_allocator();
+
     let mut pac = pac::Peripherals::take().unwrap();
     let core = pac::CorePeripherals::take().unwrap();
     let mut watchdog = Watchdog::new(pac.WATCHDOG);
@@ -75,6 +95,7 @@ fn main() -> ! {
         sio.gpio_bank0,
         &mut pac.RESETS,
     );
+
     let uart = unwrap!(init_uart(
         pac.UART1,
         &mut pac.RESETS,
@@ -84,13 +105,34 @@ fn main() -> ! {
 
     let mut ktuart = kt_uart::KatanaUart::new(uart, &timer);
 
+    let button_pins = [
+        pins.gpio6.reconfigure().into_dyn_pin(),
+        pins.gpio7.reconfigure().into_dyn_pin(),
+        pins.gpio8.reconfigure().into_dyn_pin(),
+        pins.gpio9.reconfigure().into_dyn_pin(),
+        pins.gpio10.reconfigure().into_dyn_pin(),
+    ];
+
+
+    let (mut pio0, sm0, _, _, _) = pac.PIO0.split(&mut pac.RESETS);
+
+    unwrap!(
+        buttons::init_buttons::<_, _, 0>(sm0, &mut pio0, clocks.system_clock.freq(), button_pins)
+            .map_err(|_| "PIO install error")
+    );
+
     let mut next_status_send = timer.now().offset_ms(300);
 
     loop {
         delay.delay_ms(1);
 
+        while let Some(ch) = buttons::pop_change_queue() {
+            ktuart.enqueue_send(kt_sysex::status(ch));
+        } 
+
         if timer.has_passed(next_status_send) {
-            ktuart.enqueue_send(kt_sysex::status(0));
+            let btn = buttons::current();
+            ktuart.enqueue_send(kt_sysex::status(btn));
             next_status_send = next_status_send.offset_ms(300);
         }
 
