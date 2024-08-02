@@ -4,7 +4,8 @@ use rp2040_hal::{
     fugit::RateExtU32,
     pac,
     timer::{self, Instant},
-    uart::{self, UartDevice}, Clock,
+    uart::{self, UartDevice},
+    Clock,
 };
 
 use crate::{
@@ -30,11 +31,12 @@ impl<'t, UART: UartDevice, Pins: uart::ValidUartPinout<UART>> KatanaUart<'t, UAR
         clocks: &ClocksManager,
         timer: &'t timer::Timer,
     ) -> Result<Self, uart::Error> {
-
-        let uart = uart::UartPeripheral::new(u, pins, resets).enable(
+        let mut uart = uart::UartPeripheral::new(u, pins, resets).enable(
             uart::UartConfig::new(62500.Hz(), uart::DataBits::Eight, None, uart::StopBits::One),
             clocks.peripheral_clock.freq(),
         )?;
+
+        uart.enable_rx_interrupt();
 
         Ok(Self {
             uart,
@@ -55,7 +57,8 @@ impl<'t, UART: UartDevice, Pins: uart::ValidUartPinout<UART>> KatanaUart<'t, UAR
         self.rx_queue.pop_front()
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, delay: &mut cortex_m::delay::Delay) {
+        let mut wait_done = false;
         loop {
             let new_state = match &self.state {
                 State::Idle => self.tick_idle(),
@@ -64,8 +67,22 @@ impl<'t, UART: UartDevice, Pins: uart::ValidUartPinout<UART>> KatanaUart<'t, UAR
                 State::WaitReply(wait_start) => self.tick_wait_reply(*wait_start),
             };
             match new_state {
-                Some(ns) => self.state = ns,
-                None => break,
+                Some(ns) => {
+                    defmt::trace!("New state: {}", &ns);
+                    wait_done = false;
+                    self.state = ns;
+                }
+                None => {
+                    if wait_done {
+                        break;
+                    } else {
+                        // Wait a bit (~ 2x uart msg time) and try again
+                        const DELAY_TIME_US: u32 = 2 * 1_000_000 / (62500 / 9);
+                        delay.delay_us(DELAY_TIME_US);
+                        wait_done = true;
+                        continue;
+                    }
+                }
             }
         }
     }
@@ -120,6 +137,7 @@ impl<'t, UART: UartDevice, Pins: uart::ValidUartPinout<UART>> KatanaUart<'t, UAR
             match kt_sysex::validate_rx(&buf) {
                 kt_sysex::RxValidateRes::Incomplete => continue,
                 kt_sysex::RxValidateRes::Complete => {
+                    defmt::debug!("Received: {}", &buf);
                     if self.rx_queue.push_back(buf).is_err() {
                         defmt::error!("Rx queue full!")
                     }
@@ -158,6 +176,7 @@ impl<'t, UART: UartDevice, Pins: uart::ValidUartPinout<UART>> KatanaUart<'t, UAR
                             if b[0] == buf[pos] {
                                 if pos + 1 == buf.len() {
                                     // Complete
+                                    defmt::debug!("Sent msg {}", buf);
                                     Some(State::WaitReply(self.timer.now()))
                                 } else {
                                     Some(State::Sending(SendState::Send(buf, pos + 1)))
@@ -199,4 +218,29 @@ enum State {
 enum SendState {
     Send(MsgBuf, usize),
     WaitingEcho(MsgBuf, usize, Instant),
+}
+
+impl defmt::Format for State {
+    fn format(&self, fmt: defmt::Formatter) {
+        match self {
+            State::Idle => defmt::write!(fmt, "Idle"),
+            State::Sending(ss) => defmt::write!(fmt, "Sending({})", ss),
+            State::WaitReply(t) => defmt::write!(fmt, "WaitReply(started: {})", t.ticks()),
+            State::Receiving(buf) => defmt::write!(fmt, "Receiving(len: {})", buf.len()),
+        }
+    }
+}
+
+impl defmt::Format for SendState {
+    fn format(&self, fmt: defmt::Formatter) {
+        match self {
+            SendState::Send(_msg, pos) => defmt::write!(fmt, "Send(pos: {})", pos),
+            SendState::WaitingEcho(_msg, pos, t) => defmt::write!(
+                fmt,
+                "WaitingEcho(pos: {}, wait_started: {})",
+                pos,
+                t.ticks()
+            ),
+        }
+    }
 }

@@ -1,5 +1,14 @@
 [target.'cfg(all(target_arch = "arm", target_os = "none"))']
-runner = "probe-rs run --chip RP2040 --protocol swd"
+runner = [
+  "probe-rs",
+  "run",
+  "--chip",
+  "RP2040",
+  "--protocol",
+  "swd",
+  "--log-format",
+  "[{f:dimmed}:{l:dimmed} {t}] {L:bold} {s}",
+]
 linker = "flip-link"
 rustflags = [
   "-C", "link-arg=--nmagic",

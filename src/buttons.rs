@@ -124,10 +124,11 @@ pub fn init_buttons<
 
     let prog = program();
 
-    let total_debounce_instructions = prog.debounce_cycle_instructions * prog.debounce_cycles;
     const TARGET_DEBOUNCE_TIME_MS: u32 = 5;
-    let target_clk_div: u32 = (TARGET_DEBOUNCE_TIME_MS * (sys_freq.to_Hz() / 1000)) // instructions during the target time
-        / total_debounce_instructions as u32;
+    let total_debounce_instructions =
+        prog.debounce_cycle_instructions as u32 * prog.debounce_cycles as u32;
+    let target_clk_div = (TARGET_DEBOUNCE_TIME_MS * (sys_freq.to_Hz() / 1000)) // instructions during the target time
+        / total_debounce_instructions;
     let clk_div = target_clk_div.min(u16::MAX as u32) as u16;
 
     let installed = pio.install(&prog.program)?;
@@ -149,9 +150,7 @@ pub fn init_buttons<
 
     rx.enable_rx_not_empty_interrupt(pio_irq);
 
-    defmt::unwrap!(critical_section::with(|cs| BUTTONS_PIO_SM_RX
-        .borrow(cs)
-        .replace(Some(Box::new(rx)))));
+    critical_section::with(|cs| BUTTONS_PIO_SM_RX.borrow(cs).replace(Some(Box::new(rx))));
 
     Ok(())
 }
@@ -161,6 +160,7 @@ pub fn on_interrupt() {
         if let Some(rx) = BUTTONS_PIO_SM_RX.borrow_ref_mut(cs).as_mut() {
             while let Some(b) = rx.read() {
                 let b = (b & 0xFF) as u8;
+                defmt::info!("Buttons change: {:x}", b);
                 CURRENT_BUTTONS.borrow(cs).set(b);
                 if BUTTON_CHANGE_QUEUE.borrow_ref_mut(cs).push_back(b).is_err() {
                     defmt::warn!("BUTTON_CHANGE_QUEUE full");

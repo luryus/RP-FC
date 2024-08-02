@@ -4,13 +4,20 @@
 #![no_std]
 #![no_main]
 
+use core::cell::RefCell;
+
 use bsp::entry;
+use critical_section::Mutex;
 use defmt::*;
 use defmt_rtt as _;
 use embedded_alloc::Heap;
 use panic_probe as _;
 
-use rp2040_hal::gpio::PullNone;
+use rp2040_hal::{
+    fugit::ExtU32,
+    gpio::PullNone,
+    timer::{Alarm, Alarm0},
+};
 use rp_pico as bsp;
 
 use bsp::hal::{
@@ -21,6 +28,7 @@ use bsp::hal::{
     timer,
     watchdog::Watchdog,
 };
+use static_cell::StaticCell;
 use time::{InstantEx, *};
 
 extern crate alloc;
@@ -33,10 +41,40 @@ mod time;
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
 
+static STATUS_MSG_ALARM: Mutex<RefCell<Option<Alarm0>>> = Mutex::new(RefCell::new(None));
+
+static mut TIMER_REF: Option<&timer::Timer> = None;
+static TIMER: StaticCell<timer::Timer> = StaticCell::new();
+
 #[interrupt]
 fn PIO0_IRQ_0() {
     buttons::on_interrupt();
 }
+
+#[interrupt]
+fn TIMER_IRQ_0() {
+    // Reschedule
+    critical_section::with(|cs| {
+        if let Some(al) = STATUS_MSG_ALARM.borrow_ref_mut(cs).as_mut() {
+            unwrap!(al.schedule(100u32.millis()).map_err(|_| "Schedule error"));
+            al.clear_interrupt();
+        }
+    });
+}
+
+#[interrupt]
+fn UART1_IRQ() {
+    // Just clear the flag, this is only used for wfi wake
+    // The UartPeripheral::enable_rx_interrupts function enables
+    // both the rx interrupt and the receive timeout interrupt, clear both.
+    let s = unsafe { pac::UART1::steal() };
+    s.uarticr()
+        .write(|f| f.rxic().clear_bit_by_one().rtic().clear_bit_by_one());
+}
+
+defmt::timestamp!("{=u64:us}", unsafe {
+    TIMER_REF.map(|t| t.get_counter().ticks()).unwrap_or(0)
+});
 
 fn init_allocator() {
     use core::mem::MaybeUninit;
@@ -70,7 +108,17 @@ fn main() -> ! {
 
     let mut delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
 
-    let timer = timer::Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
+    let mut timer = timer::Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
+
+    let mut status_alarm = defmt::unwrap!(timer.alarm_0());
+    status_alarm.enable_interrupt();
+    unwrap!(status_alarm
+        .schedule(100u32.millis())
+        .map_err(|_| "Schedule error for status alarm"));
+    critical_section::with(|cs| STATUS_MSG_ALARM.borrow_ref_mut(cs).replace(status_alarm));
+
+    let timer = TIMER.init(timer);
+    unsafe { TIMER_REF = Some(timer) };
 
     let pins = bsp::Pins::new(
         pac.IO_BANK0,
@@ -88,7 +136,7 @@ fn main() -> ! {
         &mut pac.RESETS,
         uart_pins,
         &clocks,
-        &timer
+        timer
     ));
 
     let button_pins = [
@@ -111,8 +159,19 @@ fn main() -> ! {
 
     let mut next_status_send = timer.now().offset_ms(300);
 
+    unsafe {
+        pac::NVIC::unmask(pac::Interrupt::TIMER_IRQ_0);
+        pac::NVIC::unmask(pac::Interrupt::PIO0_IRQ_0);
+        pac::NVIC::unmask(pac::Interrupt::UART1_IRQ);
+    }
+
     loop {
-        delay.delay_ms(1);
+        // Wait until woken by an interrupt
+        // - UART data receive
+        // - Button pressed / PIO interrupt
+        // - Timer trigger
+        cortex_m::asm::wfi();
+        trace!("Main loop woke (interrupt)");
 
         while let Some(ch) = buttons::pop_change_queue() {
             ktuart.enqueue_send(kt_sysex::status(ch));
@@ -124,7 +183,7 @@ fn main() -> ! {
             next_status_send = next_status_send.offset_ms(300);
         }
 
-        ktuart.tick();
+        ktuart.tick(&mut delay);
 
         while let Some(rx) = ktuart.pop_rx() {
             defmt::info!("Got msg {}", rx);
