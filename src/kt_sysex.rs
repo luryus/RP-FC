@@ -64,14 +64,14 @@ fn validate_checksum(msg: &[u8]) -> bool {
 }
 
 fn checksum(msg: &[u8]) -> Result<u8, MessageTooShort> {
-    if msg.len() < 2 {
+    if msg.len() < 3 {
         return Err(MessageTooShort);
     }
 
-    Ok(0x80
-        - msg[..msg.len() - 2]
+    Ok((0x80
+        - msg[1..msg.len() - 2]
             .iter()
-            .fold(0u8, |acc, x| (acc + x) & 0x7f))
+            .fold(0u8, |acc, x| (acc + x) & 0x7f)) & 0x7f)
 }
 
 #[cfg(test)]
