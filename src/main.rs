@@ -140,11 +140,12 @@ fn main() -> ! {
     ));
 
     let button_pins = [
-        pins.gpio6.reconfigure().into_dyn_pin(),
-        pins.gpio7.reconfigure().into_dyn_pin(),
-        pins.gpio8.reconfigure().into_dyn_pin(),
-        pins.gpio9.reconfigure().into_dyn_pin(),
-        pins.gpio10.reconfigure().into_dyn_pin(),
+        pins.gpio16.reconfigure().into_dyn_pin(),
+        pins.gpio17.reconfigure().into_dyn_pin(),
+        pins.gpio18.reconfigure().into_dyn_pin(),
+        pins.gpio19.reconfigure().into_dyn_pin(),
+        pins.gpio20.reconfigure().into_dyn_pin(),
+        pins.gpio21.reconfigure().into_dyn_pin(),
     ];
 
     let (mut pio0, sm0, _, _, _) = pac.PIO0.split(&mut pac.RESETS);
