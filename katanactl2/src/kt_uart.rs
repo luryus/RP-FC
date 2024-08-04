@@ -1,4 +1,5 @@
 use heapless::Deque;
+use katana_sysex::IncompleteRxMessage;
 use rp2040_hal::{
     clocks::ClocksManager,
     fugit::RateExtU32,
@@ -8,10 +9,7 @@ use rp2040_hal::{
     Clock,
 };
 
-use crate::{
-    kt_sysex,
-    time::{InstantEx, TimerEx},
-};
+use crate::time::{InstantEx, TimerEx};
 
 pub type MsgBuf = heapless::Vec<u8, 16>;
 
@@ -90,7 +88,7 @@ impl<'t, UART: UartDevice, Pins: uart::ValidUartPinout<UART>> KatanaUart<'t, UAR
     fn tick_idle(&mut self) -> Option<State> {
         if self.uart.uart_is_readable() {
             // Start a new receive
-            Some(State::Receiving(Default::default()))
+            Some(State::Receiving(IncompleteRxMessage::start_rx()))
         } else if !self.tx_queue.is_empty() {
             // If not receiving anything, start a new send
             if self.safe_to_start_send() {
@@ -106,7 +104,7 @@ impl<'t, UART: UartDevice, Pins: uart::ValidUartPinout<UART>> KatanaUart<'t, UAR
 
     fn tick_wait_reply(&mut self, wait_start: timer::Instant) -> Option<State> {
         if self.uart.uart_is_readable() {
-            Some(State::Receiving(Default::default()))
+            Some(State::Receiving(IncompleteRxMessage::start_rx()))
         } else if self.timer.has_passed(wait_start.offset_ms(100)) {
             defmt::error!("Reply wait timed out");
             Some(State::Idle)
@@ -115,35 +113,32 @@ impl<'t, UART: UartDevice, Pins: uart::ValidUartPinout<UART>> KatanaUart<'t, UAR
         }
     }
 
-    fn tick_receiving(&mut self, mut buf: MsgBuf) -> Option<State> {
+    fn tick_receiving(&mut self, mut msg: IncompleteRxMessage) -> Option<State> {
+        use katana_sysex::IncompleteMessageUpdateRes::*;
+
         let mut changed = false;
         while self.uart.uart_is_readable() {
             changed = true;
             // Read byte
             let mut b = [0u8; 1];
-            match self.uart.read_full_blocking(&mut b) {
-                Ok(_) => {
-                    if buf.push(b[0]).is_err() {
-                        defmt::error!("Receive buffer full, msg too long");
-                        return Some(State::Idle);
-                    }
-                }
+            let read_byte = match self.uart.read_full_blocking(&mut b) {
+                Ok(_) => b[0],
                 Err(e) => {
                     defmt::error!("Uart read error: {}", e);
                     return Some(State::Idle);
                 }
-            }
+            };
 
-            match kt_sysex::validate_rx(&buf) {
-                kt_sysex::RxValidateRes::Incomplete => continue,
-                kt_sysex::RxValidateRes::Complete => {
-                    defmt::debug!("Received: {}", &buf);
-                    if self.rx_queue.push_back(buf).is_err() {
+            msg = match msg.update(read_byte) {
+                Incomplete(im) => im,
+                Complete(m) => {
+                    defmt::debug!("Received: {}", &m);
+                    if self.rx_queue.push_back(m.into_iter().collect()).is_err() {
                         defmt::error!("Rx queue full!")
                     }
                     return Some(State::Idle);
                 }
-                kt_sysex::RxValidateRes::Invalid(reason) => {
+                Invalid(reason) => {
                     defmt::error!("Rx msg invalid: {}", reason);
                     // TODO: drop first byte and try again?
                     return Some(State::Idle);
@@ -152,7 +147,7 @@ impl<'t, UART: UartDevice, Pins: uart::ValidUartPinout<UART>> KatanaUart<'t, UAR
         }
 
         if changed {
-            Some(State::Receiving(buf))
+            Some(State::Receiving(msg))
         } else {
             None
         }
@@ -211,7 +206,7 @@ enum State {
     Idle,
     Sending(SendState),
     WaitReply(Instant),
-    Receiving(MsgBuf),
+    Receiving(IncompleteRxMessage),
 }
 
 #[derive(Clone)]
@@ -226,7 +221,7 @@ impl defmt::Format for State {
             State::Idle => defmt::write!(fmt, "Idle"),
             State::Sending(ss) => defmt::write!(fmt, "Sending({})", ss),
             State::WaitReply(t) => defmt::write!(fmt, "WaitReply(started: {})", t.ticks()),
-            State::Receiving(buf) => defmt::write!(fmt, "Receiving(len: {})", buf.len()),
+            State::Receiving(msg) => defmt::write!(fmt, "Receiving(len: {})", msg.len()),
         }
     }
 }

@@ -1,0 +1,7 @@
+[package]
+name = "katana_sysex"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+defmt = "0.3.8"

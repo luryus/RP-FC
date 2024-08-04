@@ -34,7 +34,6 @@ use time::{InstantEx, *};
 extern crate alloc;
 
 mod buttons;
-mod kt_sysex;
 mod kt_uart;
 mod time;
 
@@ -175,12 +174,12 @@ fn main() -> ! {
         trace!("Main loop woke (interrupt)");
 
         while let Some(ch) = buttons::pop_change_queue() {
-            ktuart.enqueue_send(kt_sysex::status(ch));
+            ktuart.enqueue_send(katana_sysex::status(ch).as_bytes().into_iter().collect());
         }
 
         if timer.has_passed(next_status_send) {
             let btn = buttons::current();
-            ktuart.enqueue_send(kt_sysex::status(btn));
+            ktuart.enqueue_send(katana_sysex::status(btn).as_bytes().into_iter().collect());
             next_status_send = next_status_send.offset_ms(300);
         }
 

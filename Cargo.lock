@@ -449,6 +449,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "katana_sysex"
+version = "0.1.0"
+dependencies = [
+ "defmt",
+]
+
+[[package]]
 name = "katanactl2"
 version = "0.1.0"
 dependencies = [
@@ -460,6 +467,7 @@ dependencies = [
  "embedded-alloc",
  "embedded-hal 1.0.0",
  "heapless",
+ "katana_sysex",
  "panic-probe",
  "pio",
  "pio-proc",
