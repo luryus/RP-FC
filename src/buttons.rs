@@ -43,7 +43,7 @@ fn program() -> ButtonDebouncePioProgram {
 
 start:
     // Read the input pins
-    in pins, 4
+    in pins, 6
 
     // Check if the value changed from previous iteration
     mov y isr
@@ -152,15 +152,18 @@ pub fn init_buttons<
 
     critical_section::with(|cs| BUTTONS_PIO_SM_RX.borrow(cs).replace(Some(Box::new(rx))));
 
+    let _sm = sm.start();
+    
     Ok(())
 }
 
 pub fn on_interrupt() {
+    defmt::trace!("pio interrupt");
     critical_section::with(|cs| {
         if let Some(rx) = BUTTONS_PIO_SM_RX.borrow_ref_mut(cs).as_mut() {
             while let Some(b) = rx.read() {
-                let b = (b & 0xFF) as u8;
-                defmt::info!("Buttons change: {:x}", b);
+                let b = (!b & 0x3F) as u8;
+                defmt::info!("Buttons change: 0x{:02x}", b);
                 CURRENT_BUTTONS.borrow(cs).set(b);
                 if BUTTON_CHANGE_QUEUE.borrow_ref_mut(cs).push_back(b).is_err() {
                     defmt::warn!("BUTTON_CHANGE_QUEUE full");
