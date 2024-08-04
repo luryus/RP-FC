@@ -474,6 +474,7 @@ dependencies = [
  "rp-pico",
  "rp2040-hal",
  "static_cell",
+ "vcc-gnd-yd-rp2040",
 ]
 
 [[package]]
@@ -1063,6 +1064,19 @@ checksum = "98816b1accafbb09085168b90f27e93d790b4bfa19d883466b5e53315b5f06a6"
 dependencies = [
  "heapless",
  "portable-atomic",
+]
+
+[[package]]
+name = "vcc-gnd-yd-rp2040"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "084fe66fb26a0c3fcd3ad1de8c0e7c8dd1debbffd6fae7d03479371227554f4f"
+dependencies = [
+ "cortex-m-rt",
+ "fugit",
+ "rp2040-boot2",
+ "rp2040-hal",
+ "usb-device",
 ]
 
 [[package]]

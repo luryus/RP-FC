@@ -6,6 +6,14 @@
 
 use core::cell::RefCell;
 
+#[cfg(all(feature = "rp-pico", feature = "vcc-gnd-yd-rp2040"))]
+compile_error!("Only one board support feature must be enabled");
+
+#[cfg(feature = "rp-pico")]
+use rp_pico as bsp;
+#[cfg(feature = "vcc-gnd-yd-rp2040")]
+use vcc_gnd_yd_rp2040 as bsp;
+
 use bsp::entry;
 use critical_section::Mutex;
 use defmt::*;
@@ -18,7 +26,6 @@ use rp2040_hal::{
     gpio::PullNone,
     timer::{Alarm, Alarm0},
 };
-use rp_pico as bsp;
 
 use bsp::hal::{
     clocks::{init_clocks_and_plls, Clock},
