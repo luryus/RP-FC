@@ -1,5 +1,5 @@
 [workspace]
-members = [ "katana_sysex","katanactl2"]
+members = [ "katana_sysex","katanactl"]
 resolver = "2"
 
 

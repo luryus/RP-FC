@@ -1,5 +1,5 @@
 [package]
-name = "katanactl2"
+name = "katanactl"
 version = "0.1.0"
 edition = "2021"
 

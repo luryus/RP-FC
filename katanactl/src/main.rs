@@ -175,7 +175,7 @@ fn main() -> ! {
         pac::NVIC::unmask(pac::Interrupt::TIMER_IRQ_0);
         pac::NVIC::unmask(pac::Interrupt::PIO0_IRQ_0);
         pac::NVIC::unmask(pac::Interrupt::UART1_IRQ);
-    }
+    }   
 
     loop {
         // Wait until woken by an interrupt

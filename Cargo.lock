@@ -456,7 +456,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "katanactl2"
+name = "katanactl"
 version = "0.1.0"
 dependencies = [
  "cortex-m",
