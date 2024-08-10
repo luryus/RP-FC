@@ -10,6 +10,7 @@ const MSG_END: u8 = 0xf7;
 pub struct Message<const LEN: usize> {
     buf: [u8; LEN]
 }
+pub type RxMessage = Message<RX_MSG_LEN>;
 
 impl<const LEN: usize> Format for Message<LEN> {
     fn format(&self, fmt: defmt::Formatter) {
@@ -114,6 +115,16 @@ impl<const LEN: usize> Message<LEN> {
     }
 }
 
+impl RxMessage {
+    pub fn led_status(&self) -> Option<u8> {
+        if self.buf[1] != 0x00 || self.buf[2] != 0x00 {
+            None
+        } else {
+            Some(self.buf[3])
+        }
+    }
+}
+
 impl<const LEN: usize> IntoIterator for Message<LEN> {
     type Item = u8;
 
@@ -126,6 +137,12 @@ impl<const LEN: usize> IntoIterator for Message<LEN> {
 
 pub fn status(footswitch: u8) -> Message<9> {
     let mut buf = [MSG_BEGIN, 0, 0, 0, 0, footswitch, 0, 0, MSG_END];
+    _ = set_checksum(&mut buf[..]);
+    Message { buf }
+}
+
+pub fn footswitch_change(footswitch: u8) -> Message<7> {
+    let mut buf = [MSG_BEGIN, 0, 0x02, footswitch, 0, 0, MSG_END];
     _ = set_checksum(&mut buf[..]);
     Message { buf }
 }

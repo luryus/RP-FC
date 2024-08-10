@@ -3,6 +3,10 @@ members = [ "katana_sysex","katanactl2"]
 resolver = "2"
 
 
+[patch.crates-io]
+rp2040-hal = { git = "https://github.com/rp-rs/rp-hal.git", rev = "23a68bce0b914eff13a0e750ba22b0d3f616e06a" }
+
+
 # cargo build/run
 [profile.dev]
 codegen-units = 1

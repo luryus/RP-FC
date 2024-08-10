@@ -1,5 +1,5 @@
 use heapless::Deque;
-use katana_sysex::IncompleteRxMessage;
+use katana_sysex::{RxMessage, IncompleteRxMessage};
 use rp2040_hal::{
     clocks::ClocksManager,
     fugit::RateExtU32,
@@ -18,7 +18,7 @@ pub struct KatanaUart<'t, UART: UartDevice, Pins: uart::ValidUartPinout<UART>> {
     timer: &'t timer::Timer,
     state: State,
     tx_queue: Deque<MsgBuf, 5>,
-    rx_queue: Deque<MsgBuf, 2>,
+    rx_queue: Deque<RxMessage, 2>,
 }
 
 impl<'t, UART: UartDevice, Pins: uart::ValidUartPinout<UART>> KatanaUart<'t, UART, Pins> {
@@ -51,7 +51,7 @@ impl<'t, UART: UartDevice, Pins: uart::ValidUartPinout<UART>> KatanaUart<'t, UAR
         }
     }
 
-    pub fn pop_rx(&mut self) -> Option<MsgBuf> {
+    pub fn pop_rx(&mut self) -> Option<RxMessage> {
         self.rx_queue.pop_front()
     }
 
@@ -133,7 +133,7 @@ impl<'t, UART: UartDevice, Pins: uart::ValidUartPinout<UART>> KatanaUart<'t, UAR
                 Incomplete(im) => im,
                 Complete(m) => {
                     defmt::debug!("Received: {}", &m);
-                    if self.rx_queue.push_back(m.into_iter().collect()).is_err() {
+                    if self.rx_queue.push_back(m).is_err() {
                         defmt::error!("Rx queue full!")
                     }
                     return Some(State::Idle);

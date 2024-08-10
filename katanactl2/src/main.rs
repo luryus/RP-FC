@@ -21,18 +21,15 @@ use defmt_rtt as _;
 use embedded_alloc::Heap;
 use panic_probe as _;
 
-use rp2040_hal::{
-    fugit::ExtU32,
-    gpio::PullNone,
-    timer::{Alarm, Alarm0},
-};
-
 use bsp::hal::{
     clocks::{init_clocks_and_plls, Clock},
     pac::{self, interrupt},
     pio::PIOExt,
     sio::Sio,
     timer,
+    fugit::ExtU32,
+    gpio::{PinGroup, PullNone, PinState},
+    timer::{Alarm, Alarm0},
     watchdog::Watchdog,
 };
 use static_cell::StaticCell;
@@ -154,6 +151,14 @@ fn main() -> ! {
         pins.gpio21.reconfigure().into_dyn_pin(),
     ];
 
+    let mut led_group = PinGroup::new()
+        .add_pin(pins.gpio10.into_push_pull_output_in_state(PinState::Low))
+        .add_pin(pins.gpio11.into_push_pull_output_in_state(PinState::Low))
+        .add_pin(pins.gpio12.into_push_pull_output_in_state(PinState::Low))
+        .add_pin(pins.gpio13.into_push_pull_output_in_state(PinState::Low))
+        .add_pin(pins.gpio14.into_push_pull_output_in_state(PinState::Low))
+        .add_pin(pins.gpio15.into_push_pull_output_in_state(PinState::Low));
+
     let (mut pio0, sm0, _, _, _) = pac.PIO0.split(&mut pac.RESETS);
 
     unwrap!(buttons::init_buttons::<_, _, 0>(
@@ -181,19 +186,25 @@ fn main() -> ! {
         trace!("Main loop woke (interrupt)");
 
         while let Some(ch) = buttons::pop_change_queue() {
-            ktuart.enqueue_send(katana_sysex::status(ch).as_bytes().into_iter().collect());
+            ktuart.enqueue_send(katana_sysex::footswitch_change(ch).into_iter().collect());
         }
 
         if timer.has_passed(next_status_send) {
             let btn = buttons::current();
-            ktuart.enqueue_send(katana_sysex::status(btn).as_bytes().into_iter().collect());
+            ktuart.enqueue_send(katana_sysex::status(btn).into_iter().collect());
             next_status_send = next_status_send.offset_ms(300);
         }
 
         ktuart.tick(&mut delay);
 
         while let Some(rx) = ktuart.pop_rx() {
-            defmt::info!("Got msg {}", rx);
+            match rx.led_status() {
+                Some(led_status) => {
+                    defmt::info!("New LED status: {:02x}", led_status);
+                    led_group.set_u32((led_status as u32) << 10);
+                },
+                None => defmt::warn!("Got an unknown msg: {}", rx)
+            }
         }
     }
 }
