@@ -4,7 +4,7 @@
 #![no_std]
 #![no_main]
 
-use core::cell::RefCell;
+use core::{cell::RefCell, ptr::addr_of_mut};
 
 #[cfg(all(feature = "rp-pico", feature = "vcc-gnd-yd-rp2040"))]
 compile_error!("Only one board support feature must be enabled");
@@ -18,7 +18,7 @@ use bsp::entry;
 use critical_section::Mutex;
 use defmt::*;
 use defmt_rtt as _;
-use embedded_alloc::Heap;
+use embedded_alloc::LlffHeap;
 use panic_probe as _;
 
 use bsp::hal::{
@@ -42,7 +42,7 @@ mod kt_uart;
 mod time;
 
 #[global_allocator]
-static HEAP: Heap = Heap::empty();
+static HEAP: LlffHeap = LlffHeap::empty();
 
 static STATUS_MSG_ALARM: Mutex<RefCell<Option<Alarm0>>> = Mutex::new(RefCell::new(None));
 
@@ -83,7 +83,7 @@ fn init_allocator() {
     use core::mem::MaybeUninit;
     const HEAP_SIZE: usize = 2048;
     static mut HEAP_MEM: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
-    unsafe { HEAP.init(HEAP_MEM.as_ptr() as usize, HEAP_SIZE) };
+    unsafe { HEAP.init(addr_of_mut!(HEAP_MEM) as usize, HEAP_SIZE) };
 }
 
 #[entry]
