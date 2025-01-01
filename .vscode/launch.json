@@ -21,7 +21,7 @@
             "coreConfigs": [
                 {
                     "coreIndex": 0,
-                    "programBinary": "${workspaceFolder}/target/thumbv6m-none-eabi/debug/katanactl2",
+                    "programBinary": "${workspaceFolder}/target/thumbv6m-none-eabi/debug/rp_fc",
                     "svdFile": "${workspaceFolder}/rp2040.svd",
                     "rttEnabled": true
                 }
@@ -40,7 +40,7 @@
             "request": "attach",
             "servertype": "openocd",
             "cwd": "${workspaceFolder}/target/",
-            "executable": "${workspaceFolder}/target/thumbv6m-none-eabi/debug/katanactl2",
+            "executable": "${workspaceFolder}/target/thumbv6m-none-eabi/debug/rp_fc",
             "device": "RP2040",
             "configFiles": [
                 "interface/cmsis-dap.cfg",
