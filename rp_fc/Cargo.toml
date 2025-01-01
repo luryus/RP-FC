@@ -1,7 +1,9 @@
 [package]
 name = "rp_fc"
 version = "1.0.0"
+authors = ["Lauri Koskela <lk@lkoskela.com>"]
 edition = "2021"
+license = "MIT"
 
 [dependencies]
 rp2040-hal = { version = "0.10.0", features = ["critical-section-impl", "defmt"], git = "https://github.com/rp-rs/rp-hal.git", rev = "23a68bce0b914eff13a0e750ba22b0d3f616e06a" }

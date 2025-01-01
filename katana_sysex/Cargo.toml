@@ -1,7 +1,9 @@
 [package]
 name = "katana_sysex"
 version = "0.1.0"
+authors = ["Lauri Koskela <lk@lkoskela.com>"]
 edition = "2021"
+license = "MIT"
 
 [dependencies]
 defmt = "0.3.8"
