@@ -4,7 +4,7 @@ RP2040 Foot Controller. A Boss GA-FC foot controller replacement for Boss Katana
 
 ## About
 
-This project acts as a GA-FC-compatible footswitch for Boss Katana Gen3 amps. A RP2040 microcontroller, e.g. a Raspberry Pi Pico, implements the serial communication with the amp. A simple circuit with a couple of optocouplers is required around the RP2040 (source for that [here](https://www.vguitarforums.com/smf/index.php?topic=19959.msg166947#msg166947)). This new foot controller connects to the amp with a single TRS cable, and gets powered with that same cable.
+This project acts as a GA-FC-compatible footswitch for Boss Katana Gen3 amps. A RP2040 microcontroller, e.g. a Raspberry Pi Pico, implements the serial communication with the amp. A simple circuit with a couple of optocouplers is required around the RP2040 (source for that [here](https://web.archive.org/web/20250102140200/https://www.vguitarforums.com/smf/index.php?topic=19959.msg180440#msg180440)). This new foot controller connects to the amp with a single TRS cable, and gets powered with that same cable.
 
 This has only been tested with Katana 100 Gen3. I know there are differences in the GA-FC communication between Gen 3 and the previous versions of the amps, so I don't know if this works with those or not.
 
